@@ -38,7 +38,7 @@ class PodResourceOperator:
         ssd_results = self._get_results(filter_string_ssd)
         pod_info_ssd = self._get_pod_info(ssd_results, 'ssd_usage')
 
-        pod_info = {**pod_info_memory, **pod_info_cpu, **pod_info_ssd}
+        pod_info = self._merge_pod_info(pod_info_memory, pod_info_cpu, pod_info_ssd)
         self._insert_into_bigquery(pod_info)
 
     def _get_filter(self, metric_type):
@@ -65,23 +65,29 @@ class PodResourceOperator:
         for result in results:
             for point in result.points:
                 metric_value = point.value.int64_value
-                if metric_name == 'max_memory_usage':
-                    metric_value /= (1024 * 1024 * 1024)  # Convert to GB
-                if (result.resource.labels["pod_name"], result.resource.labels["namespace_name"]) not in pod_info:
-                    pod_info[(result.resource.labels["pod_name"], result.resource.labels["namespace_name"])] = {
+                key = (result.resource.labels["pod_name"], result.resource.labels["namespace_name"])
+                if key not in pod_info:
+                    pod_info[key] = {
                         'start_time': point.interval.start_time,
                         'end_time': point.interval.end_time,
                         metric_name: metric_value
                     }
                 else:
-                    if metric_value > pod_info[(result.resource.labels["pod_name"], result.resource.labels["namespace_name"])][metric_name]:
-                        pod_info[(result.resource.labels["pod_name"], result.resource.labels["namespace_name"])] = {
-                            'start_time': point.interval.start_time,
-                            'end_time': point.interval.end_time,
-                            metric_name: metric_value
-                        }
+                    pod_info[key][metric_name] = metric_value
+                    pod_info[key]['start_time'] = point.interval.start_time
+                    pod_info[key]['end_time'] = point.interval.end_time
         return pod_info
 
+    def _merge_pod_info(self, pod_info_memory, pod_info_cpu, pod_info_ssd):
+        pod_info = {}
+        for d in [pod_info_memory, pod_info_cpu, pod_info_ssd]:
+            for key, value in d.items():
+                if key not in pod_info:
+                    pod_info[key] = value
+                else:
+                    pod_info[key].update(value)
+        return pod_info
+    
     def _insert_into_bigquery(self, pod_info):
         client = bigquery.Client()
         full_table_id = "datapool-1806.wiwi_test.GKE_POD_MEMORY_USAGE"
