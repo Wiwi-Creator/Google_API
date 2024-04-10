@@ -70,6 +70,18 @@ class PodResourceOperator:
     def _insert_into_bigquery(self, pod_info_memory):
         client = bigquery.Client()
         full_table_id = "datapool-1806.wiwi_test.GKE_POD_MEMORY_USAGE"
+
+        schema = [
+            bigquery.SchemaField("Pod_Name", "STRING"),
+            bigquery.SchemaField("Namespace", "STRING"),
+            bigquery.SchemaField("Start_Time", "TIMESTAMP"),
+            bigquery.SchemaField("End_Time", "TIMESTAMP"),
+            bigquery.SchemaField("Max_Memory_Usage_GB", "FLOAT64"),
+        ]
+
+        table = bigquery.Table(full_table_id, schema=schema)
+        table = client.create_table(table, exists_ok=True)  # Use exists_ok=True to not raise error if table already exists
+
         rows_to_insert = [
             (
                 pod_name,
@@ -80,7 +92,8 @@ class PodResourceOperator:
             )
             for (pod_name, namespace), info in pod_info_memory.items()
         ]
-        errors = client.insert_rows(table=full_table_id, json_rows=rows_to_insert)
+
+        errors = client.insert_rows(table, rows_to_insert)
         if errors:
             print(f"Errors while inserting rows: {errors}")
         else:

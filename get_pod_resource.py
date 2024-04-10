@@ -1,4 +1,4 @@
-from PodResourceOperator.operator import PodResourceOperator
+from Monitoring.PodResourceOperator.operator import PodResourceOperator
 import datetime
 
 
