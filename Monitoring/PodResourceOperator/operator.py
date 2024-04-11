@@ -2,17 +2,15 @@ from google.cloud import monitoring_v3
 from google.cloud import bigquery
 from google.cloud.monitoring_v3.types import TimeInterval
 from google.protobuf.timestamp_pb2 import Timestamp
-from Monitoring.configs import MonitoringAPI
 
 
 class PodResourceOperator:
-    def __init__(self, start_time, end_time):
+    def __init__(self, metric_type, metric_url, table_id, start_time, end_time):
         self.client = monitoring_v3.MetricServiceClient()
         self.project_name = "projects/datapool-1806"
-        self.memory_metric_type = MonitoringAPI.memory_used_bytes_url
-        self.cpu_metric_type = MonitoringAPI.cpu_usage_time_url
-        self.ssd_metric_type = MonitoringAPI.ephemeral_storage_used_bytes_url
-
+        self.metric_type = metric_type
+        self.metric_url = metric_url
+        self.table_id = table_id
         # Create TimeInterval
         self.interval = TimeInterval()
 
@@ -26,21 +24,20 @@ class PodResourceOperator:
         self.interval.end_time = end_timestamp
 
     def run(self):
-        filter_string_memory = self._get_filter(self.memory_metric_type)
+        filter_string_memory = self._get_filter(self.metric_url)
         memory_results = self._get_results(filter_string_memory)
-        pod_info_memory = self._get_pod_info(memory_results, 'max_memory_usage')
-        self._insert_into_bigquery(pod_info_memory, "GKE_POD_MEMORY", 'max_memory_usage')
+        pod_info_memory = self._get_pod_info(memory_results, self.metric_type)
+        self._insert_into_bigquery(pod_info_memory, self.table_id, self.metric_type)
 
-    def _get_filter(self, metric_type):
+    def _get_filter(self, metric_url):
         filter_string = (
-            f'metric.type = "{metric_type}" '
+            f'metric.type = "{metric_url}" '
             'AND resource.type = "k8s_container" '
             'AND resource.labels.namespace_name = "default" '
             )
         return filter_string
 
     def _get_results(self, filter_string):
-        # Construct the query for memory usage
         results = self.client.list_time_series(
             request={
                 "name": self.project_name,
@@ -50,7 +47,7 @@ class PodResourceOperator:
         )
         return results
 
-    def _get_pod_info(self, results, metric_name):
+    def _get_pod_info(self, results, metric_type):
         pod_info = {}
         for result in results:
             for point in result.points:
@@ -60,15 +57,15 @@ class PodResourceOperator:
                     pod_info[key] = {
                         'start_time': point.interval.start_time,
                         'end_time': point.interval.end_time,
-                        metric_name: metric_value
+                        metric_type: metric_value
                     }
                 else:
-                    pod_info[key][metric_name] = metric_value
+                    pod_info[key][metric_type] = metric_value
                     pod_info[key]['start_time'] = point.interval.start_time
                     pod_info[key]['end_time'] = point.interval.end_time
         return pod_info
 
-    def _insert_into_bigquery(self, pod_info, table_name, metric_name):
+    def _insert_into_bigquery(self, pod_info, table_name, metric_type):
         client = bigquery.Client()
         full_table_id = f"datapool-1806.wiwi_test.{table_name}"
 
@@ -77,7 +74,7 @@ class PodResourceOperator:
             bigquery.SchemaField("Namespace", "STRING"),
             bigquery.SchemaField("Start_Time", "TIMESTAMP"),
             bigquery.SchemaField("End_Time", "TIMESTAMP"),
-            bigquery.SchemaField(metric_name, "FLOAT64"),
+            bigquery.SchemaField(metric_type, "FLOAT64"),
         ]
 
         table = bigquery.Table(full_table_id, schema=schema)
@@ -89,7 +86,7 @@ class PodResourceOperator:
                 "namespace": namespace,
                 "start_time": info['start_time'],
                 "end_time": info['end_time'],
-                metric_name: info[metric_name],
+                metric_type: info[metric_type],
             }
             for (pod_name, namespace), info in pod_info.items()
         ]
