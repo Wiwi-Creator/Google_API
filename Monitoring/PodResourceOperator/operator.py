@@ -29,17 +29,7 @@ class PodResourceOperator:
         filter_string_memory = self._get_filter(self.memory_metric_type)
         memory_results = self._get_results(filter_string_memory)
         pod_info_memory = self._get_pod_info(memory_results, 'max_memory_usage')
-
-        filter_string_cpu = self._get_filter(self.cpu_metric_type)
-        cpu_results = self._get_results(filter_string_cpu)
-        pod_info_cpu = self._get_pod_info(cpu_results, 'cpu_usage_time')
-
-        filter_string_ssd = self._get_filter(self.ssd_metric_type)
-        ssd_results = self._get_results(filter_string_ssd)
-        pod_info_ssd = self._get_pod_info(ssd_results, 'ssd_usage')
-
-        pod_info = self._merge_pod_info(pod_info_memory, pod_info_cpu, pod_info_ssd)
-        self._insert_into_bigquery(pod_info)
+        self._insert_into_bigquery(pod_info_memory, "GKE_POD_MEMORY", 'max_memory_usage')
 
     def _get_filter(self, metric_type):
         filter_string = (
@@ -78,43 +68,29 @@ class PodResourceOperator:
                     pod_info[key]['end_time'] = point.interval.end_time
         return pod_info
 
-    def _merge_pod_info(self, pod_info_memory, pod_info_cpu, pod_info_ssd):
-        pod_info = {}
-        for d in [pod_info_memory, pod_info_cpu, pod_info_ssd]:
-            for key, value in d.items():
-                if key not in pod_info:
-                    pod_info[key] = value
-                else:
-                    pod_info[key].update(value)
-        return pod_info
-    
-    def _insert_into_bigquery(self, pod_info):
+    def _insert_into_bigquery(self, pod_info, table_name, metric_name):
         client = bigquery.Client()
-        full_table_id = "datapool-1806.wiwi_test.GKE_POD_MEMORY_USAGE"
+        full_table_id = f"datapool-1806.wiwi_test.{table_name}"
 
         schema = [
             bigquery.SchemaField("Pod_Name", "STRING"),
             bigquery.SchemaField("Namespace", "STRING"),
             bigquery.SchemaField("Start_Time", "TIMESTAMP"),
             bigquery.SchemaField("End_Time", "TIMESTAMP"),
-            bigquery.SchemaField("Max_Memory_Usage_GB", "FLOAT64"),
-            bigquery.SchemaField("CPU_Usage_Time", "FLOAT64"),
-            bigquery.SchemaField("SSD_Usage", "FLOAT64"),
+            bigquery.SchemaField(metric_name, "FLOAT64"),
         ]
 
         table = bigquery.Table(full_table_id, schema=schema)
         table = client.create_table(table, exists_ok=True)
 
         rows_to_insert = [
-            (
-                pod_name,
-                namespace,
-                info['start_time'],
-                info['end_time'],
-                info.get('max_memory_usage', None),
-                info.get('cpu_usage_time', None),
-                info.get('ssd_usage', None),
-            )
+            {
+                "pod_name": pod_name,
+                "namespace": namespace,
+                "start_time": info['start_time'],
+                "end_time": info['end_time'],
+                metric_name: info[metric_name],
+            }
             for (pod_name, namespace), info in pod_info.items()
         ]
 
@@ -122,4 +98,4 @@ class PodResourceOperator:
         if errors:
             print(f"Errors while inserting rows: {errors}")
         else:
-            print("Rows inserted successfully.")
+            print(f"Rows inserted successfully into {table_name}.")
