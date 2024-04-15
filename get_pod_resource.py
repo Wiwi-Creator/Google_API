@@ -1,20 +1,71 @@
 from Monitoring.PodResourceOperator.operator import PodResourceOperator
-from Monitoring.configs import MonitoringAPI
+from Monitoring.configs import MonitoringAPI, MonitoringTableID
+from google.protobuf.timestamp_pb2 import Timestamp
 import datetime
 
-
-# Define the start and end time for the query
 start_time = datetime.datetime.now() - datetime.timedelta(days=5)
+start_timestamp = Timestamp()
+start_timestamp.FromDatetime(start_time)
 end_time = datetime.datetime.now()
-memory_metric_type = MonitoringAPI.memory_used_bytes_url
-cpu_metric_type = MonitoringAPI.cpu_usage_time_url
-ssd_metric_type = MonitoringAPI.ephemeral_storage_used_bytes_url
+end_timestamp = Timestamp()
+end_timestamp.FromDatetime(end_time)
 
-memory_table_id = "GKE_POD_MEMORY"
-ssd_table_id = "GKE_POD_SSD"
+memory_request_operator = PodResourceOperator(
+    'memory_request_bytes',
+    MonitoringAPI.memory_request_bytes_url,
+    MonitoringTableID.memory_request_table,
+    'int64_value',
+    start_timestamp,
+    end_timestamp
+    )
+memory_request_operator.run()
 
-memory_operator = PodResourceOperator('max_memory_usage', memory_metric_type, memory_table_id, start_time, end_time)
-memory_operator.run()
+memory_used_operator = PodResourceOperator(
+    'memory_usage_bytes',
+    MonitoringAPI.memory_used_bytes_url,
+    MonitoringTableID.memory_used_table,
+    'int64_value',
+    start_timestamp,
+    end_timestamp
+    )
+memory_used_operator.run()
 
-#memory_operator = PodResourceOperator('max_ssd_usage', ssd_metric_type, ssd_table_id, start_time, end_time)
-#memory_operator.run()
+cpu_request_operator = PodResourceOperator(
+    'cpu_request_bytes',
+    MonitoringAPI.cpu_request_cores_url,
+    MonitoringTableID.cpu_request_table,
+    'int64_value',
+    start_timestamp,
+    end_timestamp
+    )
+cpu_request_operator.run()
+
+cpu_used_operator = PodResourceOperator(
+    'cpu_used_bytes',
+    MonitoringAPI.cpu_usage_time_url,
+    MonitoringTableID.cpu_used_table,
+    'int64_value',
+    start_timestamp,
+    end_timestamp
+    )
+cpu_used_operator.run()
+
+ssd_request_operator = PodResourceOperator(
+    'ssd_request_bytes',
+    MonitoringAPI.ephemeral_storage_request_bytes_url,
+    MonitoringTableID.ssd_request_table,
+    'int64_value',
+    start_timestamp,
+    end_timestamp
+    )
+ssd_request_operator.run()
+
+ssd_request_operator = PodResourceOperator(
+    'ssd_used_bytes',
+    MonitoringAPI.ephemeral_storage_used_bytes_url,
+    MonitoringTableID.ssd_used_table,
+    'int64_value',
+    start_timestamp,
+    end_timestamp
+    )
+ssd_request_operator.run()
