@@ -24,8 +24,10 @@ class PodResourceOperator:
         filter_string_memory = self._get_filter(self.metric_url)
         memory_results = self._get_results(self.interval, filter_string_memory)
         pod_info = self._get_pod_info(memory_results, self.metric_type, self.value_type)
+
         bq_operator = BigqueryExporterBase(projectID=self.project_id)
         logging.info(f"Updating table {self.table_id} with {len(pod_info)} rows")
+
         bq_operator.update_table_using_replace(data=pod_info,
                                                schema_path=self.schema_path,
                                                datasetID='GKE_monitor_raw',
@@ -58,8 +60,7 @@ class PodResourceOperator:
                 pod_info.append({
                     'pod_name': key[0],
                     'namespace': key[1],
-                    'start_time': point.interval.start_time.strftime('%Y-%m-%dT%H:%M:%S'),
-                    'end_time': point.interval.end_time.strftime('%Y-%m-%dT%H:%M:%S'),
+                    'Execute_Time': point.interval.start_time.strftime('%Y-%m-%dT%H:%M:%S'),
                     metric_type: metric_value
                 })
         return pod_info
