@@ -22,10 +22,12 @@ class PodResourceOperator:
         metric_types = [
             ("memory_request_bytes", MonitoringAPI.memory_request_bytes_url, MonitoringTableID.memory_request_table, 'int64_value'),
             ("memory_used_bytes", MonitoringAPI.memory_used_bytes_url, MonitoringTableID.memory_used_table, 'int64_value'),
+            ("memory_request_utilization", MonitoringAPI.memory_request_utilization_url, MonitoringTableID.memory_utilization_table, 'double_value'),
             ("cpu_request_cores", MonitoringAPI.cpu_request_cores_url, MonitoringTableID.cpu_request_table, 'double_value'),
             ("cpu_used_seconds", MonitoringAPI.cpu_usage_time_url, MonitoringTableID.cpu_used_table, 'double_value'),
+            ("cpu_request_utilization", MonitoringAPI.cpu_request_utilization_url, MonitoringTableID.cpu_utilization_table, 'double_value'),
             ("ssd_request_bytes", MonitoringAPI.ephemeral_storage_request_bytes_url, MonitoringTableID.ssd_request_table, 'int64_value'),
-            ("ssd_used_bytes", MonitoringAPI.ephemeral_storage_used_bytes_url, MonitoringTableID.ssd_used_table, 'int64_value'),
+            ("ssd_used_bytes", MonitoringAPI.ephemeral_storage_used_bytes_url, MonitoringTableID.ssd_used_table, 'int64_value')
         ]
 
         for metric_name, metric_url, table_id, value_type in metric_types:
@@ -65,10 +67,9 @@ class PodResourceOperator:
         for result in results:
             for point in result.points:
                 metric_value = getattr(point.value, value_type)
-                key = (result.resource.labels["pod_name"], result.resource.labels["namespace_name"])
                 pod_info.append({
-                    'pod_name': key[0],
-                    'namespace': key[1],
+                    'pod_name': result.resource.labels["pod_name"],
+                    'namespace': result.resource.labels["namespace_name"],
                     'Execute_Time': point.interval.start_time.replace(tzinfo=utc).astimezone(timezone('Asia/Taipei')).strftime('%Y-%m-%dT%H:%M:%S'),
                     metric_type: metric_value
                 })
